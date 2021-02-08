@@ -1,0 +1,273 @@
+---
+title: "week1"
+author: "Elisabet, Kasper, Emma-Louise og Liv"
+date: "8/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. What's Riccardo's estimated knowledge of CogSci? What is the probability he knows more than chance (0.5) [try figuring this out. if you can't peek into chapters 3.1 and 3.2 and/or the slides]?
+- First implement a grid approximation (hint check paragraph 2.4.1!) with a uniform prior, calculate the posterior and plot the results
+- Then implement a quadratic approximation (hint check paragraph 2.4.2!).
+- N.B. for the rest of the exercise just keep using the grid approximation (we'll move to quadratic approximations in two classes)
+
+```{r}
+##universals
+#define density 
+dens <- 1e4
+
+p_grid <- seq(from = 0, to = 1, length.out = dens)
+
+#testing if the prior looks odd
+#load the 'dens' function from rethinking
+library(rethinking)
+rethinking::dens(rbinom(1e4, 6, runif(1e4, 0, 1)))
+rethinking::dens(rbinom(1e4, 6, runif(1e4, 0.5, 1)))
+rethinking::dens(rbinom(1e4, 6, rnorm(1e4, 0.5, 1)))
+```
+
+
+```{r}
+#code for Riccardo
+
+#define a prior
+#ricprior <- dnorm (p_grid, 0.5, 0.1) #centered around chance, sd = 0.1
+#Riccardo requests a uniform prior/a flat prior, so here it is
+ricprior <- rep(1, dens)
+
+#computing likelihood at each value in the grid
+riclikelihood <- dbinom(3, size = 6, prob = p_grid )
+
+#compute the posterior
+ricunstd.posterior <- riclikelihood * ricprior
+
+#standardizing the posterior so it sums to 1
+ricposterior <- ricunstd.posterior/sum(ricunstd.posterior)
+
+#draw the plot
+ricplot <- data.frame(grid = p_grid, posterior = ricposterior, prior = ricprior, likelihood = riclikelihood)
+
+ggplot(ricplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability")
+
+#Probability that Riccardo knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(ricposterior[p_grid > 0.5]) #50% probability that Kristian Tylén knows more than chance
+
+
+#Implementing a quadratic approximation 
+ric_qa <- quap(
+    alist(
+        C ~ dbinom( C+I ,p) ,  # binomial likelihood
+        p ~ dunif(0,1)     # uniform prior
+), data=list(C=3, I=3) )
+#summary of the quadratic approximation
+precis(ric_qa)
+#Assuming the posterior is Gaussian, it is maximized at 0.5, and its standard deviation is 0.2.
+```
+
+2. Estimate all the teachers' knowledge of CogSci. Who's best? Use grid approximation. Comment on the posteriors of Riccardo and Mikkel.
+2a. Produce plots of the prior, and posterior for each teacher.
+
+```{r}
+##code for Kristian
+krisprior <- rep(1, dens) #define uniform prior (flat)
+krislikelihood <- dbinom(2, size = 2, prob = p_grid) #computing likelihood at each value in the grid
+krisunstd.posterior <- krislikelihood * krisprior #compute the posterior
+krisposterior <- krisunstd.posterior/sum(krisunstd.posterior) #standardizing the posterior
+#draw the plot
+krisplot <- data.frame(grid = p_grid, posterior = krisposterior, prior = krisprior, likelihood = krislikelihood)
+
+ggplot(krisplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("Kristians knowledge of CogSci")+
+  ylab("posterior probability")
+#Probability that Kristian knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(krisposterior[p_grid > 0.5]) #87.5% probability that Kristian Tylén knows more than chance
+
+  ##code for Daina
+dainaprior <- rep(1, dens) #define uniform prior (flat) 
+dainalikelihood <- dbinom(160, size = 198, prob = p_grid )#computing likelihood at each value in the grid
+dainaunstd.posterior <- dainalikelihood * dainaprior #compute the posterior
+dainaposterior <- dainaunstd.posterior/sum(dainaunstd.posterior) #standardizing the posterior
+#draw the plot
+dainaplot <- data.frame(grid = p_grid, posterior = dainaposterior, prior = dainaprior, likelihood = dainalikelihood)
+
+ggplot(dainaplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("Dainas knowledge of CogSci")+
+  ylab("posterior probability")
+#Probability that Daina knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(dainaposterior[p_grid > 0.5]) #100% probability that daina knows more than chance
+
+  ##code for Mikkel
+mikprior <- rep(1, dens) #define uniform prior (flat)
+miklikelihood <- dbinom(66, size = 132, prob = p_grid ) #computing likelihood at each value in the grid
+mikunstd.posterior <- miklikelihood * mikprior #compute the posterior
+mikposterior <- mikunstd.posterior/sum(mikunstd.posterior) #standardizing the posterior
+#draw the plot
+mikplot <- data.frame(grid = p_grid, posterior = mikposterior, prior = mikprior, likelihood = miklikelihood)
+
+ggplot(mikplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("Mikkels knowledge of CogSci")+
+  ylab("posterior probability")
+#Probability that Mikkel knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(mikposterior[p_grid > 0.5]) #50% probability that Mikkel knows more than chance
+```
+
+3. Change the prior. Given your teachers have all CogSci jobs, you should start with a higher appreciation of their knowledge: the prior is a normal distribution with a mean of 0.8 and a standard deviation of 0.2. Do the results change (and if so how)?
+3a. Produce plots of the prior and posterior for each teacher.
+
+```{r}
+##code for Riccardo
+newricprior <- dnorm (p_grid, 0.8, 0.2)#define a (normal) prior
+#likelihood is the same
+newricunstd.posterior <- riclikelihood * newricprior #compute the posterior
+newricposterior <- newricunstd.posterior/sum(newricunstd.posterior) #standardizing the posterior
+#draw the plot
+ricplot <- data.frame(grid = p_grid, posterior = newricposterior, prior = newricprior, likelihood = riclikelihood)
+
+ggplot(ricplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("Riccardos knowledge of CogSci")+
+  ylab("posterior probability")
+
+#updated probability
+sum(newricposterior[p_grid > 0.5]) #92%
+
+
+  ##code for Kristian
+#define a prior
+newkrisprior <- dnorm (p_grid, 0.8, 0.2) #define a prior
+#likelihood is the same
+newkrisunstd.posterior <- krislikelihood * newkrisprior #compute the posterior
+newkrisposterior <- newkrisunstd.posterior/sum(newkrisunstd.posterior)#standardizing the posterior
+#draw the plot
+krisplot <- data.frame(grid = p_grid, posterior = newkrisposterior, prior = newkrisprior, likelihood = krislikelihood)
+
+ggplot(krisplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("Kristians knowledge of CogSci")+
+  ylab("posterior probability")
+
+#updated probability
+sum(newkrisposterior[p_grid > .5]) #98%
+
+
+  ##code for Daina
+newdainaprior <- dnorm (p_grid, 0.8, 0.2)
+#likelihood is the same
+newdainaunstd.posterior <- dainalikelihood * newdainaprior
+newdainaposterior <- newdainaunstd.posterior/sum(newdainaunstd.posterior)
+#draw the plot
+dainaplot <- data.frame(grid = p_grid, posterior = newdainaposterior, prior = newdainaprior, likelihood = dainalikelihood)
+
+ggplot(dainaplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("Dainas knowledge of CogSci")+
+  ylab("posterior probability")
+
+#updated probability
+sum(newdainaposterior[p_grid > .5]) #100%
+
+
+##code for Mikkel
+newmikprior <- dnorm (p_grid, 0.8, 0.2)
+#likelihood is the same
+newmikunstd.posterior <- miklikelihood * newmikprior
+newmikposterior <- newmikunstd.posterior/sum(newmikunstd.posterior)
+#draw the plot
+mikplot <- data.frame(grid = p_grid, posterior = newmikposterior, prior = newmikprior, likelihood = miklikelihood)
+
+ggplot(mikplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("Mikkels knowledge of CogSci")+
+  ylab("posterior probability")
+
+#updated probability
+sum(newmikposterior[p_grid > .5]) #62%
+#lower value than Riccardo, because Riccardo had a smaller sample pool while Mikkels sample pool is large and he is stil absolute shit.
+```
+
+4. You go back to your teachers and collect more data (multiply the previous numbers by 100). Calculate their knowledge with both a uniform prior and a normal prior with a mean of 0.8 and a standard deviation of 0.2. Do you still see a difference between the results? Why?
+```{r}
+  ##code for Riccardo
+bigriclikelihood <- dbinom(300, size = 600, prob = p_grid)
+
+ricflat <- bigriclikelihood * ricprior #create new standardized posterior from uniform prior
+ricflatpost <- ricflat / sum(ricflat) #standardize 
+sum(ricflatpost[p_grid > .5]) #50%
+
+ricnormal <- bigriclikelihood * newricprior #create new standardized posterior from normal prior
+ricnormalpost <- ricnormal / sum(ricnormal)
+sum(ricnormalpost[p_grid > .5]) #56%
+
+  ##code for Kristian
+bigkrislikelihood <- dbinom(200, size = 200, prob = p_grid)
+
+krisflat <- bigkrislikelihood * krisprior #create new standardized posterior from uniform prior
+krisflatpost <- krisflat / sum(krisflat) #standardize 
+sum(krisflatpost[p_grid > .5]) #100%
+
+krisnormal <- bigkrislikelihood * newkrisprior #create new standardized posterior from normal prior
+krisnormalpost <- krisnormal / sum(krisnormal)
+sum(krisnormalpost[p_grid > .5]) #100%
+
+  ##code for Daina
+bigdainalikelihood <- dbinom(16000, size = 19800, prob = p_grid)
+
+dainaflat <- bigdainalikelihood * dainaprior #create new standardized posterior from uniform prior
+dainaflatpost <- dainaflat / sum(dainaflat) #standardize 
+sum(dainaflatpost[p_grid > .5]) #100%
+
+dainanormal <- bigdainalikelihood * dainaprior #create new standardized posterior from normal prior
+dainanormalpost <- dainanormal / sum(dainanormal)
+sum(dainanormalpost[p_grid > .5]) #100%
+
+
+  ##code for Mikkel
+bigmiklikelihood <- dbinom(6600, size = 13200, prob = p_grid)
+
+mikflat <- bigmiklikelihood * mikprior #create new standardized posterior from uniform prior
+mikflatpost <- mikflat / sum(mikflat) #standardize 
+sum(mikflatpost[p_grid > .5]) #50%
+
+miknormal <- bigmiklikelihood * newmikprior #create new standardized posterior from normal prior
+miknormalpost <- miknormal / sum(miknormal)
+sum(miknormalpost[p_grid > .5]) #51%
+```
+we see a slight difference in the normal prior as it assumes each teacher is quite capable, whereas the flat prior assumes mediocreness
+
+5. Imagine you're a skeptic and think your teachers do not know anything about CogSci, given the content of their classes. How would you operationalize that belief?
+-- set a normal prior with a low mean (e.g. 0.3) and a sd of 0.1 or 0.2
+
+6. Optional question: Can you estimate the difference between Riccardo's estimated knowledge and that of each of the other teachers? Would you deem it credible (that is, would you believe that it is actually different)? 
