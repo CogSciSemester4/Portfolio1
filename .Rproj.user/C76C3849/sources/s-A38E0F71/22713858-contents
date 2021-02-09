@@ -1,0 +1,327 @@
+---
+title: "Computational Modeling - Assignment 1"
+author: "Riccardo Fusaroli"
+date: "07/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+install.packages("pacman")
+
+pacman::p_load("rethinking", "tidyverse")
+```
+
+## In this assignment we learn how to assess rates from a binomial distribution, using the case of assessing your teachers' knowledge of CogSci
+
+N.B. this markdown has 2 parts as it spans 2 weeks of teaching
+
+### First part
+
+You want to assess your teachers' knowledge of cognitive science. "These guys are a bunch of drama(turgist) queens, mindless philosophers, chattering communication people and Russian spies. Do they really know CogSci?", you think.
+
+To keep things simple (your teachers should not be faced with too complicated things):
+- You created a pool of equally challenging questions on CogSci
+- Each question can be answered correctly or not (we don't allow partially correct answers, to make our life simpler).
+- Knowledge of CogSci can be measured on a scale from 0 (negative knowledge, all answers wrong) through 0.5 (random chance) to 1 (awesome CogSci superpowers)
+
+This is the data:
+- Riccardo: 3 correct answers out of 6 questions
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Daina: 160 correct answers out of 198 questions (Daina never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+Questions:
+
+1. What's Riccardo's estimated knowledge of CogSci? What is the probability he knows more than chance (0.5) [try figuring this out. if you can't peek into chapters 3.1 and 3.2 and/or the slides]?
+- First implement a grid approximation (hint check paragraph 2.4.1!) with a uniform prior, calculate the posterior and plot the results
+- Then implement a quadratic approximation (hint check paragraph 2.4.2!).
+- N.B. for the rest of the exercise just keep using the grid approximation (we'll move to quadratic approximations in two classes)
+
+```{r}
+#setting the density (how many points between 0 and 1)
+dens <- 1e4
+
+p_grid <- seq(from = 0, to = 1, length.out = dens)
+
+#defining a prior
+prior <- dnorm(p_grid, 0.5, 0.1)
+
+#Testing if the prior looks crazy
+dens(rbinom(1e4, 9, runif(1e4, 0, 1)))
+dens(rbinom(1e4, 9, runif(1e4, 0.5, 1)))
+
+# compute likelihood at each value in grid
+ric_likelihood <- dbinom(3, size = 6, prob = p_grid)
+
+# compute product of likelihood and prior
+ric_unstd.posterior <- ric_likelihood * prior
+
+# standardize the posterior, so it sums to 1
+ric_posterior <- ric_unstd.posterior / sum(ric_unstd.posterior)
+
+d <- data.frame(grid = p_grid, posterior = ric_posterior, prior = prior, likelihood = ric_likelihood)
+ggplot(d, aes(p_grid,ric_posterior)) +geom_point() +geom_line()+theme_classic()+  geom_line(aes(p_grid, prior/dens),color= 'red')+  xlab("Knowledge of CogSci") + ylab("posterior probability")
+
+#Probability that Riccardo knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(ric_posterior[p_grid > 0.5])
+
+#Implementing a quadratic approximation 
+ric_qa <- quap(
+    alist(
+        C ~ dbinom( C+I ,p) ,  # binomial likelihood
+        p ~ dunif(0,1)     # uniform prior
+), data=list(C=3, I=3) )
+
+#summary of the quadratic approximation
+precis(ric_qa)
+
+#Assuming the posterior is Gaussian, it is maximized at 0.5, and its standard deviation is 0.2.
+```
+
+
+2. Estimate all the teachers' knowledge of CogSci. Who's best? Use grid approximation. Comment on the posteriors of Riccardo and Mikkel.
+2a. Produce plots of the prior, and posterior for each teacher.
+
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Daina: 160 correct answers out of 198 questions (Daina never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+```{r}
+## Kristian's knowledge of CogSci
+#continuing with dens = 1e4, p_grid and prior
+#Testing if the prior looks crazy
+dens(rbinom(1e4, 2, runif(1e4, 0, 1)))
+
+kris_likelihood <- dbinom(2, size = 2, prob = p_grid) #likelihood at each value in grid
+kris_unstd.posterior <- kris_likelihood * prior #product of likelihood and prior
+kris_posterior <- kris_unstd.posterior / sum(kris_unstd.posterior) #standardizing the posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = kris_posterior, prior = prior, likelihood = kris_likelihood)
+ggplot(d, aes(p_grid,kris_posterior)) +geom_point() +geom_line()+theme_classic()+  geom_line(aes(p_grid, prior/dens),color= 'red')+  xlab("Knowledge of CogSci") + ylab("posterior probability")
+
+#Probability that Kristian knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(kris_posterior[p_grid > 0.5]) #65% probability that Kristian Tylén knows more than chance
+
+```
+```{r}
+## Daina's knowledge of CogSci
+#continuing with dens = 1e4, p_grid and prior
+#Testing if the prior looks crazy
+dens(rbinom(1e4, 198, runif(1e4, 0, 1)))
+
+daina_likelihood <- dbinom(160, size = 198, prob = p_grid) #likelihood at each value in grid
+daina_unstd.posterior <- daina_likelihood * prior #product of likelihood and prior
+daina_posterior <- daina_unstd.posterior / sum(daina_unstd.posterior) #standardizing the posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = daina_posterior, prior = prior, likelihood = daina_likelihood)
+ggplot(d, aes(p_grid,daina_posterior)) +geom_point() +geom_line()+theme_classic()+  geom_line(aes(p_grid, prior/dens),color= 'red')+  xlab("Knowledge of CogSci") + ylab("posterior probability")
+
+#Probability that Daina knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(daina_posterior[p_grid > 0.5]) #100% probability that Daina Crafa knows more than chance
+```
+```{r}
+## Mikkel's knowledge of CogSci
+#continuing with dens = 1e4, p_grid and prior
+#Testing if the prior looks crazy
+dens(rbinom(1e4, 132, runif(1e4, 0, 1)))
+
+mik_likelihood <- dbinom(66, size = 132, prob = p_grid) #likelihood at each value in grid
+mik_unstd.posterior <- mik_likelihood * prior #product of likelihood and prior
+mik_posterior <- mik_unstd.posterior / sum(mik_unstd.posterior) #standardizing the posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = mik_posterior, prior = prior, likelihood = mik_likelihood)
+ggplot(d, aes(p_grid,mik_posterior)) +geom_point() +geom_line()+theme_classic()+  geom_line(aes(p_grid, prior/dens),color= 'red')+  xlab("Knowledge of CogSci") + ylab("posterior probability")
+
+#Probability that Kristian knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(mik_posterior[p_grid > 0.5]) #50% probability that Mikkel knows more than chance
+```
+Comment on the posteriors of Riccardo and Mikkel: So the priors of Riccardo and Mikkel are the same, but the posteriors are way different. Or, the area under the curve if knowledge of cogsci is > 0.5 is 50% in both cases but the plots show that the posterior probability of Mikkels knowledge is a lot larger than the prior. This must be because of the many more data points (questions) that inform the posterior in the case of Mikkel - it makes the plausibility a lot higher. 
+
+3. Change the prior. Given your teachers have all CogSci jobs, you should start with a higher appreciation of their knowledge: the prior is a normal distribution with a mean of 0.8 and a standard deviation of 0.2. Do the results change (and if so how)?
+3a. Produce plots of the prior and posterior for each teacher.
+
+```{r}
+## RICCARDO
+#continuing with dens = 1e4 and p_grid from before
+#defining a new prior, informed by our knowledge that the teachers know a lot about CogSci
+new_prior <- dnorm(p_grid, 0.8, 0.2)
+
+#Testing if the prior looks crazy
+#dens(rbinom(1e4, 6, runif(1e4, 0, 1)))
+#dens(rbinom(1e4, 198, runif(1e4, 0.5, 1)))
+
+#likelihood is still the same
+
+new_ric_unstd.posterior <- ric_likelihood * new_prior # compute new, informed product of likelihood and prior
+
+new_ric_posterior <- new_ric_unstd.posterior / sum(new_ric_unstd.posterior) # standardize the posterior, so it sums to 1
+
+d <- data.frame(grid = p_grid, posterior = new_ric_posterior, prior = new_prior, likelihood = ric_likelihood)
+ggplot(d, aes(p_grid,new_ric_posterior)) +geom_point() +geom_line()+theme_classic()+  geom_line(aes(p_grid, new_prior/dens),color= 'red')+  xlab("Knowledge of CogSci") + ylab("posterior probability")
+
+#Probability that Riccardo knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(new_ric_posterior[p_grid > 0.5]) 
+
+# 84% probability that Riccardo knows more than chance. This is based on a prior that acknowledges his position in CogSci area and a very small dataset of 6 questions. Hence the large probability despite only 50& correct answers 
+```
+```{r}
+## KRISTIAN 
+#continuing with dens = 1e4 and p_grid from before as well as the new prior defined in the chunck above. The likelihood of 2/2 is still the same
+
+new_kris_unstd.posterior <- kris_likelihood * new_prior #new posterior based on Kristians likelihood and the new prior
+new_kris_posterior <- new_kris_unstd.posterior /sum(new_kris_unstd.posterior) #standardize posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = new_kris_posterior, prior = new_prior, likelihood = kris_likelihood)
+ggplot(d, aes(p_grid, new_kris_posterior)) +
+  geom_point() + geom_line() + theme_classic() +
+  geom_line(aes(p_grid, new_prior/dens), color = 'red')+
+  xlab("Knowledge of CogSci")+
+  ylab("Posterior Probability")
+
+#Probability that Kristian knows more than chance given the new prior and the likelihood of 2/2
+sum(new_kris_posterior[p_grid > 0.5]) 
+# 97.6% probability
+```
+```{r}
+## DAINA
+#continuing with dens = 1e4 and p_grid from before as well as the new prior defined in the chunck above. The likelihood of 160/198 is still the same
+
+new_daina_unstd.posterior <- daina_likelihood * new_prior #new posterior based on Dainss likelihood and the new prior
+new_daina_posterior <- new_daina_unstd.posterior /sum(new_daina_unstd.posterior) #standardize posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = new_daina_posterior, prior = new_prior, likelihood = daina_likelihood)
+ggplot(d, aes(p_grid, new_daina_posterior)) +
+  geom_point() + geom_line() + theme_classic() +
+  geom_line(aes(p_grid, new_prior/dens), color = 'red')+
+  xlab("Knowledge of CogSci")+
+  ylab("Posterior Probability")
+
+#Probability that Daina knows more than chance given the new prior and the likelihood of 160/198
+sum(new_daina_posterior[p_grid > 0.5]) 
+# 100% probability
+```
+```{r}
+## MIKKEL
+#continuing with dens = 1e4 and p_grid from before as well as the new prior defined in the chunck above. The likelihood of 66/132 is still the same
+
+new_mik_unstd.posterior <- mik_likelihood * new_prior #new posterior based on Kristian's likelihood and the new prior
+new_mik_posterior <- new_mik_unstd.posterior /sum(new_mik_unstd.posterior) #standardize posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = new_mik_posterior, prior = new_prior, likelihood = mik_likelihood)
+ggplot(d, aes(p_grid, new_mik_posterior)) +
+  geom_point() + geom_line() + theme_classic() +
+  geom_line(aes(p_grid, new_prior/dens), color = 'red')+
+  xlab("Knowledge of CogSci")+
+  ylab("Posterior Probability")
+
+#Probability that Kristian knows more than chance given the new prior and the likelihood of 2/2
+sum(new_mik_posterior[p_grid > 0.5]) 
+# 62.4% probability
+```
+
+4. You go back to your teachers and collect more data (multiply the previous numbers by 100). Calculate their knowledge with both a uniform prior and a normal prior with a mean of 0.8 and a standard deviation of 0.2. Do you still see a difference between the results? Why?
+
+```{r}
+#RICCARDO 
+#multiplying the numbers from before with 100
+new_ric_likelihood <- dbinom(300, size = 600, prob = p_grid)
+big_ric_unstd.posterior <- new_ric_likelihood * new_prior # compute new, informed product of likelihood and prior
+
+big_ric_posterior <- big_ric_unstd.posterior / sum(big_ric_unstd.posterior) # standardize the posterior, so it sums to 1
+
+d <- data.frame(grid = p_grid, posterior = big_ric_posterior, prior = new_prior, likelihood = new_ric_likelihood)
+ggplot(d, aes(p_grid,big_ric_posterior)) +geom_point() +geom_line()+theme_classic()+  geom_line(aes(p_grid, new_prior/dens),color= 'red')+  xlab("Knowledge of CogSci") + ylab("posterior probability")
+
+#Probability that Riccardo knows more than chance (i.e. area under the curve when "Knowledge of CogSci" is > 0.5)
+sum(big_ric_posterior[p_grid > 0.5]) 
+
+# Now there's only a 56% probability compared to 84% probability when likelihood was 3/6. This is because despite the optimistic/informed prior, many data points indicate a 50% probability, pressuring the posterior lower than the prior of 80%. 
+```
+
+```{r}
+## KRISTIAN 
+#continuing with dens = 1e4 and p_grid from before as well as the new prior defined in the chunck above.
+#multiplying the numbers from before with 100
+new_kris_likelihood <- dbinom(200, size = 200, prob = p_grid)
+
+big_kris_unstd.posterior <- new_kris_likelihood * new_prior #new posterior based on Kristians likelihood*100 and the new prior
+big_kris_posterior <- big_kris_unstd.posterior /sum(big_kris_unstd.posterior) #standardize posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = big_kris_posterior, prior = new_prior, likelihood = new_kris_likelihood)
+ggplot(d, aes(p_grid, big_kris_posterior)) +
+  geom_point() + geom_line() + theme_classic() +
+  geom_line(aes(p_grid, new_prior/dens), color = 'red')+
+  xlab("Knowledge of CogSci")+
+  ylab("Posterior Probability")
+
+#Probability that Kristian knows more than chance given the new prior and the likelihood of 2/2
+sum(big_kris_posterior[p_grid > 0.5]) 
+# 100% compared to the 97.6% probability from before. This is because the likelihood of 200 correct answers on 200 questions increses the posterior probability despite not changing the prior. 
+```
+
+```{r}
+## DAINA
+#continuing with dens = 1e4 and p_grid from before as well as the new prior defined in the chunck above.
+#multiplying the numbers from before with 100
+new_daina_likelihood <- dbinom(16000, size = 19800, prob = p_grid)
+big_daina_unstd.posterior <- new_daina_likelihood * new_prior #new posterior based on Dainss likelihood*100 and the new prior
+big_daina_posterior <- big_daina_unstd.posterior /sum(big_daina_unstd.posterior) #standardize posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = big_daina_posterior, prior = new_prior, likelihood = new_daina_likelihood)
+ggplot(d, aes(p_grid, big_daina_posterior)) +
+  geom_point() + geom_line() + theme_classic() +
+  geom_line(aes(p_grid, new_prior/dens), color = 'red')+
+  xlab("Knowledge of CogSci")+
+  ylab("Posterior Probability")
+
+#Probability that Daina knows more than chance given the new prior and the likelihood of 160/198
+sum(big_daina_posterior[p_grid > 0.5]) 
+# 100% probability as before only with more certainty because of the many data points.
+
+```
+```{r}
+## MIKKEL
+#continuing with dens = 1e4 and p_grid from before as well as the new prior.
+#multiplying the numbers from before with 100
+new_mik_likelihood <- dbinom(6600, size = 13200, prob = p_grid)
+big_mik_unstd.posterior <- new_mik_likelihood * new_prior #new posterior based on Mikkel's likelihood*100 and the new prior
+big_mik_posterior <- big_mik_unstd.posterior /sum(big_mik_unstd.posterior) #standardize posterior so it sums to 1
+d <- data.frame(grid = p_grid, posterior = big_mik_posterior, prior = new_prior, likelihood = new_mik_likelihood)
+ggplot(d, aes(p_grid, big_mik_posterior)) +
+  geom_point() + geom_line() + theme_classic() +
+  geom_line(aes(p_grid, new_prior/dens), color = 'red')+
+  xlab("Knowledge of CogSci")+
+  ylab("Posterior Probability")
+
+#Probability that Kristian knows more than chance given the new prior and the likelihood of 2/2
+sum(big_mik_posterior[p_grid > 0.5]) 
+# 51.3% compared to 62.4% probability from before. Again, because of the many data points, the posterior looks less like the prior and more like the likelihood.
+```
+
+
+5. Imagine you're a skeptic and think your teachers do not know anything about CogSci, given the content of their classes. How would you operationalize that belief?
+
+We would set a very pessimistic prior, e.g. mean = 0.2 and sd = 0.1. This way, the plausibility will decrease because we inform the model about the limited amount of knowledge that our teachers possess.
+
+6. Optional question: Can you estimate the difference between Riccardo's estimated knowledge and that of each of the other teachers? Would you deem it credible (that is, would you believe that it is actually different)? 
+
+### Second part: Focusing on predictions
+
+Last year you assessed the teachers (darned time runs quick!). Now you want to re-test them and assess whether your models are producing reliable predictions. In Methods 3 we learned how to do machine-learning style assessment of predictions (e.g. rmse on testing datasets). Bayesian stats makes things a bit more complicated. So we'll try out how that works. N.B. You can choose which prior to use for the analysis of last year's data.
+
+Questions to be answered (but see guidance below):
+1- Write a paragraph discussing how assessment of prediction performance is different in Bayesian vs. frequentist models
+2- Provide at least one plot and one written line discussing prediction errors for each of the teachers.
+
+This is the old data:
+- Riccardo: 3 correct answers out of 6 questions
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Daina: 160 correct answers out of 198 questions (Daina never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+This is the new data:
+- Riccardo: 9 correct answers out of 10 questions (then he freaks out about teaching preparation and leaves)
+- Kristian: 8 correct answers out of 12 questions
+- Daina: 148 correct answers out of 172 questions (again, Daina never gets bored)
+- Mikkel: 34 correct answers out of 65 questions
+
+Guidance Tips
+
+1. There are at least two ways of assessing predictions.
+2. Last year's results are this year's expectations.
+3. Are the parameter estimates changing? (way 1)
+4. How does the new data look in last year's predictive posterior? (way 2)

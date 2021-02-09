@@ -1,0 +1,7 @@
+"0","#Probability that Kristian knows more than chance (i.e. area under the curve when ""Knowledge of CogSci"" is > 0.5)
+sum(kristianposterior[p_grid > 0.5]) #65% probability that Kristian Tylén knows more than chance
+"
+"1","[1]"
+"1"," 0.6552548"
+"1","
+"

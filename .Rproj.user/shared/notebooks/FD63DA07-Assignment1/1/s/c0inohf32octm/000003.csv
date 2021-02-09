@@ -1,0 +1,12 @@
+"0","dlikelihood <- dbinom(160, size = 198, prob = p_grid) 
+dunstd.posterior <- dlikelihood * prior 
+dposterior <- dunstd.posterior / sum(dunstd.posterior) 
+d2 <- data.frame(grid = p_grid, posterior = dposterior, prior = prior, likelihood = dlikelihood)
+ggplot(d2, aes(p_grid,dposterior)) +geom_point() +geom_line()+theme_classic()+  geom_line(aes(p_grid, prior/dens),color= 'red')+  xlab(""Knowledge of CogSci"") + ylab(""posterior probability"")
+#Probability that Daina knows more than chance:
+sum(dposterior[p_grid > 0.5])
+"
+"1","[1]"
+"1"," 1"
+"1","
+"
