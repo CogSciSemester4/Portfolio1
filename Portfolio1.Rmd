@@ -1,0 +1,602 @@
+---
+title: "Portfolio1"
+author: "Liv, Elisabet, Kasper and Emma-Louise"
+date: "2/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## In this assignment we learn how to assess rates from a binomial distribution, using the case of assessing your teachers' knowledge of CogSci
+
+N.B. this markdown has 2 parts as it spans 2 weeks of teaching
+```{r}
+library(rethinking)
+```
+
+
+### First part
+
+You want to assess your teachers' knowledge of cognitive science. "These guys are a bunch of drama(turgist) queens, mindless philosophers, chattering communication people and Russian spies. Do they really know CogSci?", you think.
+
+To keep things simple (your teachers should not be faced with too complicated things):
+- You created a pool of equally challenging questions on CogSci
+- Each question can be answered correctly or not (we don't allow partially correct answers, to make our life simpler).
+- Knowledge of CogSci can be measured on a scale from 0 (negative knowledge, all answers wrong) through 0.5 (random chance) to 1 (awesome CogSci superpowers)
+
+This is the data:
+- Riccardo: 3 correct answers out of 6 questions
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Daina: 160 correct answers out of 198 questions (Daina never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+Questions:
+
+1. What's Riccardo's estimated knowledge of CogSci? What is the probability he knows more than chance (0.5) [try figuring this out. if you can't peek into chapters 3.1 and 3.2 and/or the slides]?
+
+- First implement a grid approximation (hint check paragraph 2.4.1!) with a uniform prior, calculate the posterior and plot the results
+
+- Then implement a quadratic approximation (hint check paragraph 2.4.2!).
+
+- N.B. for the rest of the exercise just keep using the grid approximation (we'll move to quadratic approximations in two classes)
+
+```{r}
+# The knowledge parameter in this case is the theachers' rate of getting the questions right. This is an unobservable variable. 
+# We can use grid approximation to calculate the likelihood of The teachers' estimated knowledge of CogSci
+
+#Define the grid
+dens <- 20
+p_grid <- seq(from = 0, to = 1, length.out = dens)
+
+
+```
+```{r}
+
+#defining the prior as uniform. Here; flat
+ricprior <- rep( 1 , dens ) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 6, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+riclikelihood <- dbinom(3, size = 6, prob = p_grid) #p_grid defines the possible parametre values. Given that we are following a binomial distribution and the data says we have 3 correct answers out of 6, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+ricunstd.posterior <- riclikelihood*ricprior
+
+#Standardize the posterior so that it sums to 1. 
+ricposterior <- ricunstd.posterior/sum(ricunstd.posterior)
+
+#Looking at values where riccardo performs above chance
+sum(ricposterior[p_grid>0.5]) #0.5
+
+#draw the plot
+ricplot <- data.frame(grid = p_grid, posterior = ricposterior, prior = ricprior, likelihood = riclikelihood)
+
+ggplot(ricplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle("Posterior Plot for Riccardo")
+```
+```{r}
+#Finding the results through a quadratic approximation
+ric.qa <- quap(
+  alist(
+    C ~ dbinom(C+W, p), #binomial likelihood
+    p ~dunif(0,1) #uniform prior
+  ),
+  data = list(C=3, W=3) #C for correct and W for wrong
+)
+
+
+#Summary of the quadratic approximation
+precis(ric.qa)
+
+#the output shows the posterior mean value/peak of the posterior distribution (0.5), the standard deviation of the posterior distribution (0.2).
+
+#analytical calculation
+W <- 3
+C <- 3
+
+curve(dbeta(x, W+1, C+1), from = 0, to=1)
+
+#quadratic approximation
+curve(dnorm(x, 0.5, 0.2), lty=2, add = T)
+
+
+```
+
+
+
+2. Estimate all the teachers' knowledge of CogSci. Who's best? Use grid approximation. Comment on the posteriors of Riccardo and Mikkel.
+```{r}
+## Estimating Kristian,2 correct answers out of 2 questions 
+#Define the grid
+dens <- 20
+p_grid <- seq(from = 0, to = 1, length.out = dens)
+
+#defining the prior as uniform. Here; flat
+krisprior <- rep( 1 , dens ) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 2, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+krislikelihood <- dbinom(2, size = 2, prob = p_grid) # Given that we are following a binomial distribution and the data says we have 2 correct answers out of 2, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+krisunstd.posterior <- krislikelihood*krisprior
+
+#Standardize the posterior so that it sums to 1. 
+krisposterior <- krisunstd.posterior/sum(krisunstd.posterior)
+
+#Looking at values where Kristian performs above chance
+sum(krisposterior[p_grid>0.5]) #0.88
+
+
+
+
+##Estimating Daina, 160 correct answers out of 198 questions 
+#Define the grid
+dens <- 20
+p_grid <- seq(from = 0, to = 1, length.out = dens)
+
+#defining the prior as uniform. Here; flat
+dainaprior <- rep( 1 , dens ) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 198, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+dainalikelihood <- dbinom(160, size = 198, prob = p_grid) # The data says we have 160 correct answers out of 198. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+dainaunstd.posterior <- dainalikelihood*dainaprior
+
+#Standardize the posterior so that it sums to 1. 
+dainaposterior <- dainaunstd.posterior/sum(dainaunstd.posterior)
+
+#Looking at values where Daina performs above chance
+sum(dainaposterior[p_grid>0.5]) #1
+
+
+
+
+##Estimating Mikkel, 66 correct answers out of 132 questions
+dens <- 20
+p_grid <- seq(from = 0, to = 1, length.out = dens)
+
+#defining the prior as uniform. Here; flat
+mikprior <- rep( 1 , dens ) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 132, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+miklikelihood <- dbinom(66, size = 132, prob = p_grid) # The data says we have 66 correct answers out of 132. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+mikunstd.posterior <- miklikelihood*mikprior
+
+#Standardize the posterior so that it sums to 1. 
+mikposterior <- mikunstd.posterior/sum(mikunstd.posterior)
+
+#Looking at values where Mikkel performs above chance
+sum(mikposterior[p_grid>0.5]) #0.5
+
+```
+
+
+2a. Produce plots of the prior, and posterior for each teacher.
+
+```{r}
+#Plot for Riccardo
+ricplot <- data.frame(grid = p_grid, posterior = ricposterior, prior = ricprior, likelihood = riclikelihood)
+
+ggplot(ricplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle("Riccardo's Knowledge")
+
+
+#Plot for Kristian
+krisplot <- data.frame(grid = p_grid, posterior = krisposterior, prior = krisprior, likelihood = krislikelihood)
+
+ggplot(krisplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle(" Kristian's knowledge")
+
+#Plot for Daina
+dainaplot <- data.frame(grid = p_grid, posterior = dainaposterior, prior = dainaprior, likelihood = dainalikelihood)
+
+ggplot(dainaplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle("Daina's Knowledge")
+
+#Plot for Mikkel
+mikplot <- data.frame(grid = p_grid, posterior = mikposterior, prior = mikprior, likelihood = miklikelihood)
+
+ggplot(mikplot, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle(" Mikkel's Knowledge")
+```
+
+
+3. Change the prior. Given your teachers have all CogSci jobs, you should start with a higher appreciation of their knowledge: the prior is a normal distribution with a mean of 0.8 and a standard deviation of 0.2. Do the results change (and if so how)?
+
+
+```{r}
+#using the same density and grid as above
+
+#defining the prior with a normal distribution, with mean of 0.8 and standard deviation of 0.2
+
+#Completing the grid approximation for Riccardo
+ricpriornorm <- dnorm(p_grid, 0.8, 0.2)
+
+#Testing the prior. Does it look okay? Predictive prior checks. 
+# We randomly sample with rbinom.
+# We sample 10 000 time from a normally distributed prior, centered around the mean with sd: 0.2. We then extract how many times Riccardo would get correct answer out of 6 questions.
+
+rethinking::dens(rbinom(1e4, 6, rnorm(1e4, 0.8, 0.2)))
+
+
+# Compute the likelihood at each value in the grid
+riclikelihoodnorm <- dbinom(3, size = 6, prob = p_grid) #p_grid defines the possible parametre values. Given that we are following a binomial distribution and the data says we have 3 correct answers out of 6, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+ricunstd.posteriornorm <- riclikelihoodnorm*ricpriornorm
+
+#Standardize the posterior so that it sums to 1. 
+ricposteriornorm <- ricunstd.posteriornorm/sum(ricunstd.posteriornorm)
+
+#Looking at values where riccardo performs above chance
+sum(ricposteriornorm[p_grid>0.5]) #0.84 (vs. 0.5 when prior was uniform)
+
+
+## Estimating Kristian with normal prior,2 correct answers out of 2 questions 
+
+#defining the prior as normal
+krispriornorm <-  dnorm(p_grid, 0.8, 0.2)
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 2, rnorm(1e4, 0.8, 0.2))) 
+
+
+# Compute the likelihood at each value in the grid
+krislikelihoodnorm <- dbinom(2, size = 2, prob = p_grid) # Given that we are following a binomial distribution and the data says we have 2 correct answers out of 2, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+krisunstd.posteriornorm <- krislikelihoodnorm*krispriornorm
+
+#Standardize the posterior so that it sums to 1. 
+krisposteriornorm <- krisunstd.posteriornorm/sum(krisunstd.posteriornorm)
+
+#Looking at values where Kristian performs above chance
+sum(krisposteriornorm[p_grid>0.5]) #0.977 (vs. 0.88 when prior was uniform)
+
+
+
+
+##Estimating Daina, 160 correct answers out of 198 questions 
+
+
+#defining the prior as uniform. Here; flat
+dainapriornorm <-  dnorm(p_grid, 0.8, 0.2)
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 198, rnorm(1e4, 0.8, 0.2))) 
+
+# Compute the likelihood at each value in the grid
+dainalikelihoodnorm <- dbinom(160, size = 198, prob = p_grid) # The data says we have 160 correct answers out of 198. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+dainaunstd.posteriornorm <- dainalikelihoodnorm*dainapriornorm
+
+#Standardize the posterior so that it sums to 1. 
+dainaposteriornorm <- dainaunstd.posteriornorm/sum(dainaunstd.posteriornorm)
+
+#Looking at values where Daina performs above chance
+sum(dainaposteriornorm[p_grid>0.5]) #1 (same as when uniform prior, 1)
+
+
+##Estimating Mikkel, 66 correct answers out of 132 questions
+
+
+#defining the prior as uniform. Here; flat
+mikpriornorm <- dnorm(p_grid, 0.8, 0.2)
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 132, rnorm(1e4, 0.8, 0.2))) 
+
+# Compute the likelihood at each value in the grid
+miklikelihoodnorm <- dbinom(66, size = 132, prob = p_grid) # The data says we have 66 correct answers out of 132. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+mikunstd.posteriornorm <- miklikelihoodnorm*mikpriornorm
+
+#Standardize the posterior so that it sums to 1. 
+mikposteriornorm <- mikunstd.posteriornorm/sum(mikunstd.posteriornorm)
+
+#Looking at values where Mikkel performs above chance
+sum(mikposteriornorm[p_grid>0.5]) #0.633 (vs. 1 when prior was uniform.)
+```
+
+
+3a. Produce plots of the prior and posterior for each teacher.
+
+```{r}
+#Plot for Riccardo
+ricplotnorm <- data.frame(grid = p_grid, posterior = ricposteriornorm, prior = ricpriornorm, likelihood = riclikelihoodnorm)
+
+ggplot(ricplotnorm, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle("Riccardo's Knowledge, normal prior")
+
+
+#Plot for Kristian
+krisplotnorm <- data.frame(grid = p_grid, posterior = krisposteriornorm, prior = krispriornorm, likelihood = krislikelihoodnorm)
+
+ggplot(krisplotnorm, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle(" Kristian's knowledge, normal prior")
+
+#Plot for Daina
+dainaplotnorm <- data.frame(grid = p_grid, posterior = dainaposteriornorm, prior = dainapriornorm, likelihood = dainalikelihoodnorm)
+
+ggplot(dainaplotnorm, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle("Daina's Knowledge, normal prior")
+
+#Plot for Mikkel
+mikplotnorm <- data.frame(grid = p_grid, posterior = mikposteriornorm, prior = mikpriornorm, likelihood = miklikelihoodnorm)
+
+ggplot(mikplotnorm, aes(grid, posterior)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  geom_line(aes(grid, prior/dens), color = 'red') +
+  xlab("knowledge of CogSci")+
+  ylab("posterior probability") + ggtitle(" Mikkel's Knowledge, normal prior")
+```
+
+4. You go back to your teachers and collect more data (multiply the previous numbers by 100). Calculate their knowledge with both a uniform prior and a normal prior with a mean of 0.8 and a standard deviation of 0.2. Do you still see a difference between the results? Why?
+
+
+```{r}
+# Riccardo: 300 correct answers out of 6 questions
+# Kristian: 200 correct answers out of 200 questions 
+# Daina: 16 000 correct answers out of 19 800 questions 
+# Mikkel: 6 600 correct answers out of 13 200 questions
+
+
+# Riccardo's updated knowledge with uniform prior
+#defining the prior as uniform. Here; flat
+ricpriornew <- rep( 1 , dens) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 600, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+riclikelihoodnew <- dbinom(300, size = 600, prob = p_grid) #p_grid defines the possible parametre values. Given that we are following a binomial distribution and the data says we have 3 correct answers out of 6, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+ricunstd.posteriornew <- riclikelihoodnew*ricpriornew
+
+#Standardize the posterior so that it sums to 1. 
+ricposteriornew <- ricunstd.posteriornew/sum(ricunstd.posteriornew)
+
+#Looking at values where riccardo performs above chance
+sum(ricposteriornew[p_grid>0.5]) #0.5.(in the uniform version with small sample size:0.5. Same outcome)
+
+
+
+## Riccardo's updated knowledge with normal prior
+ricpriornormnew <- dnorm(p_grid, 0.8, 0.2)
+
+#Testing the prior. Does it look okay? Predictive prior checks. 
+# We randomly sample with rbinom.
+# We sample 10 000 time from a normally distributed prior, centered around the mean with sd: 0.2. We then extract how many times Riccardo would get correct answer out of 6 questions.
+
+rethinking::dens(rbinom(1e4, 600, rnorm(1e4, 0.8, 0.2)))
+
+
+# Compute the likelihood at each value in the grid
+riclikelihoodnormnew <- dbinom(300, size = 600, prob = p_grid) #p_grid defines the possible parametre values. Given that we are following a binomial distribution and the data says we have 3 correct answers out of 6, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+ricunstd.posteriornormnew <- riclikelihoodnormnew*ricpriornormnew
+
+#Standardize the posterior so that it sums to 1. 
+ricposteriornormnew <- ricunstd.posteriornormnew/sum(ricunstd.posteriornormnew)
+
+#Looking at values where riccardo performs above chance
+sum(ricposteriornormnew[p_grid>0.5]) #0.597 vs. 0.84 when smaller sample size and normal prior. 
+
+
+##Kristian's updated knowledge with uniform prior
+#defining the prior as uniform. Here; flat
+krispriornew <- rep( 1 , dens ) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 200, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+krislikelihoodnew <- dbinom(200, size = 200, prob = p_grid) # Given that we are following a binomial distribution and the data says we have 2 correct answers out of 2, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+krisunstd.posteriornew <- krislikelihoodnew*krispriornew
+
+#Standardize the posterior so that it sums to 1. 
+krisposteriornew <- krisunstd.posteriornew/sum(krisunstd.posteriornew)
+
+#Looking at values where Kristian performs above chance
+sum(krisposteriornew[p_grid>0.5]) #0.1 higher than before, when it was 0.88 for uniform prior. 
+
+
+
+
+##Kristian's updated knowledge with normal prior
+#defining the prior as normal
+krispriornormnew <-  dnorm(p_grid, 0.8, 0.2)
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 200, rnorm(1e4, 0.8, 0.2))) 
+
+
+# Compute the likelihood at each value in the grid
+krislikelihoodnormnew <- dbinom(200, size = 200, prob = p_grid) # Given that we are following a binomial distribution and the data says we have 2 correct answers out of 2, how likely are any of the values in the prior grid (p_grid)?
+
+#Compute the posterior
+krisunstd.posteriornormnew <- krislikelihoodnormnew*krispriornormnew
+
+#Standardize the posterior so that it sums to 1. 
+krisposteriornormnew <- krisunstd.posteriornormnew/sum(krisunstd.posteriornormnew)
+
+#Looking at values where Kristian performs above chance
+sum(krisposteriornormnew[p_grid>0.5]) #1 which is higher than before when it was 0.977 for normal prior. 
+
+
+#Daina's updated knowledge with uniform prior
+
+#defining the prior as uniform. Here; flat
+dainapriornew <- rep( 1 , dens ) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 19800, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+dainalikelihoodnew <- dbinom(16000, size = 19800, prob = p_grid) # The data says we have 160 correct answers out of 198. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+dainaunstd.posteriornew <- dainalikelihoodnew*dainapriornew
+
+#Standardize the posterior so that it sums to 1. 
+dainaposteriornew <- dainaunstd.posteriornew/sum(dainaunstd.posteriornew)
+
+#Looking at values where Daina performs above chance
+sum(dainaposteriornew[p_grid>0.5]) #1 same as when uniform and smaller sample size. 
+
+#Daina's updated knowledge with normal prior
+dainapriornormnew <-  dnorm(p_grid, 0.8, 0.2)
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 19800, rnorm(1e4, 0.8, 0.2))) 
+
+# Compute the likelihood at each value in the grid
+dainalikelihoodnormnew <- dbinom(16000, size = 19800, prob = p_grid) # The data says we have 160 correct answers out of 198. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+dainaunstd.posteriornormnew <- dainalikelihoodnormnew*dainapriornormnew
+
+#Standardize the posterior so that it sums to 1. 
+dainaposteriornormnew <- dainaunstd.posteriornormnew/sum(dainaunstd.posteriornormnew)
+
+#Looking at values where Daina performs above chance
+sum(dainaposteriornormnew[p_grid>0.5]) #1 same as when uniform sample size. 
+
+
+# Mikkel' s updated knowledge with uniform prior
+#defining the prior as uniform. Here; flat
+mikpriornew <- rep( 1 , dens ) # Flat
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 13200, runif(1e4, 0, 1)))
+
+# Compute the likelihood at each value in the grid
+miklikelihoodnew <- dbinom(6600, size = 13200, prob = p_grid) # The data says we have 66 correct answers out of 132. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+mikunstd.posteriornew <- miklikelihoodnew*mikpriornew
+
+#Standardize the posterior so that it sums to 1. 
+mikposteriornew <- mikunstd.posteriornew/sum(mikunstd.posteriornew)
+
+#Looking at values where Mikkel performs above chance
+sum(mikposteriornew[p_grid>0.5]) #0.5 which is lower than when uniform with small sample size (1)
+
+# Mikkel' s updated knowledge with normal prior
+#defining the prior as uniform. Here; flat
+mikpriornormnew <- dnorm(p_grid, 0.8, 0.2)
+
+#testing the flat prior. Does it look okay? Predictive prior checks
+rethinking::dens(rbinom(1e4, 13200, rnorm(1e4, 0.8, 0.2))) 
+
+# Compute the likelihood at each value in the grid
+miklikelihoodnormnew <- dbinom(6600, size = 13200, prob = p_grid) # The data says we have 66 correct answers out of 132. How likely are any of the values in the prior grid based on this data?
+
+#Compute the posterior
+mikunstd.posteriornormnew <- miklikelihoodnormnew*mikpriornormnew
+
+#Standardize the posterior so that it sums to 1. 
+mikposteriornormnew <- mikunstd.posteriornormnew/sum(mikunstd.posteriornormnew)
+
+#Looking at values where Mikkel performs above chance
+sum(mikposteriornormnew[p_grid>0.5]) #0.597 lower than before. It was at 0.633 when normal prior and smaller sample size. 
+
+
+
+```
+
+
+5. Imagine you're a skeptic and think your teachers do not know anything about CogSci, given the content of their classes. How would you operationalize that belief?
+
+6. Optional question: Can you estimate the difference between Riccardo's estimated knowledge and that of each of the other teachers? Would you deem it credible (that is, would you believe that it is actually different)? 
+
+### Second part: Focusing on predictions
+
+Last year you assessed the teachers (darned time runs quick!). Now you want to re-test them and assess whether your models are producing reliable predictions. In Methods 3 we learned how to do machine-learning style assessment of predictions (e.g. rmse on testing datasets). Bayesian stats makes things a bit more complicated. So we'll try out how that works. N.B. You can choose which prior to use for the analysis of last year's data.
+
+Questions to be answered (but see guidance below):
+1- Write a paragraph discussing how assessment of prediction performance is different in Bayesian vs. frequentist models
+2- Provide at least one plot and one written line discussing prediction errors for each of the teachers.
+
+This is the old data:
+- Riccardo: 3 correct answers out of 6 questions
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Daina: 160 correct answers out of 198 questions (Daina never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+This is the new data:
+- Riccardo: 9 correct answers out of 10 questions (then he freaks out about teaching preparation and leaves)
+- Kristian: 8 correct answers out of 12 questions
+- Daina: 148 correct answers out of 172 questions (again, Daina never gets bored)
+- Mikkel: 34 correct answers out of 65 questions
+
+Guidance Tips
+
+1. There are at least two ways of assessing predictions.
+2. Last year's results are this year's expectations.
+3. Are the parameter estimates changing? (way 1)
+4. How does the new data look in last year's predictive posterior? (way 2)
